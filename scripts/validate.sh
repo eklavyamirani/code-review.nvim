@@ -50,27 +50,16 @@ else
     fail "git not found"
 fi
 
-if git ls-remote --heads origin &>/dev/null; then
-    pass "git remote access OK"
+# Use https-origin remote (avoids SSH host key issues in container)
+if git -c credential.helper='!gh auth git-credential' ls-remote --heads https-origin &>/dev/null 2>&1; then
+    pass "git remote access OK (https-origin)"
 else
-    # SSH may not work in container — try HTTPS via gh credential helper
-    ORIGIN_URL=$(git remote get-url origin 2>/dev/null || echo "")
-    if [ -n "$ORIGIN_URL" ]; then
-        HTTPS_URL=$(echo "$ORIGIN_URL" | sed 's|git@github.com:|https://github.com/|' | sed 's|\.git$||').git
-        # Use gh as git credential helper (never puts token in URL or logs)
-        if git -c credential.helper='!gh auth git-credential' ls-remote "${HTTPS_URL}" &>/dev/null 2>&1; then
-            pass "git remote access OK (via HTTPS + gh credential helper)"
-        else
-            # Repo might be empty (no branches) — verify via gh api
-            REPO_NAME=$(echo "$ORIGIN_URL" | sed 's|.*github.com[:/]||' | sed 's|\.git$||')
-            if gh api "repos/${REPO_NAME}" --jq '.full_name' &>/dev/null; then
-                pass "git remote access OK (repo exists, may be empty)"
-            else
-                fail "git remote access failed"
-            fi
-        fi
+    # Repo might be empty (no branches yet)
+    REPO="eklavyamirani/code-review.nvim"
+    if gh api "repos/${REPO}" --jq '.full_name' &>/dev/null; then
+        pass "git remote access OK (repo exists, may be empty)"
     else
-        fail "no git remote configured"
+        fail "git remote access failed"
     fi
 fi
 
