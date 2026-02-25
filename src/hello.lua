@@ -1,0 +1,12 @@
+-- A simple greeting module
+local M = {}
+
+function M.greet(name)
+  return "Hello, " .. name .. "!"
+end
+
+function M.farewell(name)
+  return "Goodbye, " .. name .. "!"
+end
+
+return M
