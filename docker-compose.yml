@@ -1,0 +1,12 @@
+services:
+  dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - .:/plugin
+    env_file:
+      - .env
+    working_dir: /plugin
+    stdin_open: true
+    tty: true

@@ -1,0 +1,11 @@
+# Environment secrets
+.env
+
+# Neovim swap/undo
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
