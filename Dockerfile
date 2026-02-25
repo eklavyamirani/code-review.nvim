@@ -26,25 +26,26 @@ RUN curl -fsSL "https://github.com/cli/cli/releases/download/v${GH_VERSION}/gh_$
     | tar xz -C /opt \
     && ln -s "/opt/gh_${GH_VERSION}_linux_amd64/bin/gh" /usr/local/bin/gh
 
-# Create directories for Neovim plugins
-ENV NVIM_DATA_DIR=/root/.local/share/nvim
-RUN mkdir -p ${NVIM_DATA_DIR}/site/pack/deps/start
+# Plugins live at /opt/nvim-data/nvim/site/pack/... — XDG_DATA_DIRS tells Neovim to find them
+ENV NVIM_DATA_DIR=/opt/nvim-data
+ENV XDG_DATA_DIRS=/opt/nvim-data:/usr/local/share:/usr/share
+RUN mkdir -p ${NVIM_DATA_DIR}/nvim/site/pack/deps/start
 
 # Install plenary.nvim
 RUN git clone --depth 1 https://github.com/nvim-lua/plenary.nvim.git \
-    ${NVIM_DATA_DIR}/site/pack/deps/start/plenary.nvim
+    ${NVIM_DATA_DIR}/nvim/site/pack/deps/start/plenary.nvim
 
 # Install mini.nvim (for mini.test)
 RUN git clone --depth 1 https://github.com/echasnovski/mini.nvim.git \
-    ${NVIM_DATA_DIR}/site/pack/deps/start/mini.nvim
+    ${NVIM_DATA_DIR}/nvim/site/pack/deps/start/mini.nvim
 
 WORKDIR /plugin
 
 # Allow mounted volumes with different ownership
 RUN git config --global --add safe.directory /plugin
 
-# Configure gh CLI as git credential helper (for HTTPS remote access with GH_TOKEN)
-RUN gh auth setup-git 2>/dev/null || true
+# Make plugin data dir readable by any user
+RUN chmod -R a+rX ${NVIM_DATA_DIR}
 
 # The plugin source is mounted here via docker-compose
 CMD ["bash"]
