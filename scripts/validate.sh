@@ -53,14 +53,13 @@ fi
 if git ls-remote --heads origin &>/dev/null; then
     pass "git remote access OK"
 else
-    # SSH may not work in container — try HTTPS with GH_TOKEN
+    # SSH may not work in container — try HTTPS via gh credential helper
     ORIGIN_URL=$(git remote get-url origin 2>/dev/null || echo "")
     if [ -n "$ORIGIN_URL" ]; then
-        # Convert SSH URL to HTTPS with token
         HTTPS_URL=$(echo "$ORIGIN_URL" | sed 's|git@github.com:|https://github.com/|' | sed 's|\.git$||').git
-        if git ls-remote "${HTTPS_URL}" &>/dev/null 2>&1 || \
-           git -c credential.helper="!f() { echo username=x-access-token; echo password=\${GH_TOKEN}; }; f" ls-remote "${HTTPS_URL}" &>/dev/null 2>&1; then
-            pass "git remote access OK (via HTTPS)"
+        # Use gh as git credential helper (never puts token in URL or logs)
+        if git -c credential.helper='!gh auth git-credential' ls-remote "${HTTPS_URL}" &>/dev/null 2>&1; then
+            pass "git remote access OK (via HTTPS + gh credential helper)"
         else
             # Repo might be empty (no branches) — verify via gh api
             REPO_NAME=$(echo "$ORIGIN_URL" | sed 's|.*github.com[:/]||' | sed 's|\.git$||')
