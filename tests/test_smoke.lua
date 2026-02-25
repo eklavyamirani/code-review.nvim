@@ -5,7 +5,10 @@ local helpers = require("tests.helpers")
 
 local suite = T.new_set({
   hooks = {
-    pre_case = helpers.reset,
+    pre_case = function()
+      helpers.reset()
+      package.loaded["code-review.ui"] = nil
+    end,
   },
 })
 
@@ -37,6 +40,23 @@ suite["utils.system runs commands"] = function()
   local stdout, _, code = utils.system({ "echo", "hello" })
   expect.equality(code, 0)
   expect.equality(vim.trim(stdout), "hello")
+end
+
+suite["statusline returns empty when no session"] = function()
+  package.loaded["code-review.review"] = nil
+  local cr = require("code-review")
+  expect.equality(cr.statusline(), "")
+end
+
+suite["public API has expected functions"] = function()
+  local cr = require("code-review")
+  expect.equality(type(cr.start), "function")
+  expect.equality(type(cr.close), "function")
+  expect.equality(type(cr.next_file), "function")
+  expect.equality(type(cr.prev_file), "function")
+  expect.equality(type(cr.toggle_diff), "function")
+  expect.equality(type(cr.add_comment), "function")
+  expect.equality(type(cr.statusline), "function")
 end
 
 return suite

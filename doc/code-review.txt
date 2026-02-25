@@ -1,0 +1,127 @@
+*code-review.txt*    Review pull requests in Neovim
+
+==============================================================================
+CONTENTS                                              *code-review-contents*
+
+  1. Introduction ........................ |code-review-introduction|
+  2. Requirements ........................ |code-review-requirements|
+  3. Setup ............................... |code-review-setup|
+  4. Commands ............................ |code-review-commands|
+  5. Keybindings ......................... |code-review-keybindings|
+  6. Configuration ....................... |code-review-configuration|
+  7. Statusline .......................... |code-review-statusline|
+  8. Providers ........................... |code-review-providers|
+
+==============================================================================
+1. INTRODUCTION                                   *code-review-introduction*
+
+code-review.nvim is a Neovim plugin for reviewing pull requests directly
+inside your editor. It supports multiple git providers through an abstract
+interface, with GitHub as the first supported backend.
+
+Features:
+- View PR diffs in unified or side-by-side mode
+- Navigate through changed files
+- Read and write inline review comments
+- Auto-detect provider from git remote URL
+
+==============================================================================
+2. REQUIREMENTS                                   *code-review-requirements*
+
+- Neovim >= 0.10
+- git
+- plenary.nvim
+- gh CLI (for GitHub provider)
+
+==============================================================================
+3. SETUP                                                *code-review-setup*
+
+Using lazy.nvim: >lua
+  {
+    "eklavyamirani/code-review.nvim",
+    dependencies = { "nvim-lua/plenary.nvim" },
+    config = function()
+      require("code-review").setup({
+        diff_mode = "split",  -- "split" or "unified"
+      })
+    end,
+  }
+<
+
+==============================================================================
+4. COMMANDS                                          *code-review-commands*
+
+                                                              *:CodeReview*
+:CodeReview          Start a review session for the current branch's PR.
+                     Auto-detects the provider and fetches PR metadata.
+
+                                                         *:CodeReviewClose*
+:CodeReviewClose     Close the current review session.
+
+==============================================================================
+5. KEYBINDINGS                                    *code-review-keybindings*
+
+Default keybindings (active during a review session):
+
+  `]f`           Next changed file
+  `[f`           Previous changed file
+  `]c`           Next comment
+  `[c`           Previous comment
+  `<leader>cc`   Add comment at cursor line
+  `<leader>ct`   Toggle diff mode (unified/split)
+  `<leader>cs`   Submit comment (in comment input window)
+  `q` / `<Esc>`  Cancel comment (in comment input window)
+
+==============================================================================
+6. CONFIGURATION                                *code-review-configuration*
+
+>lua
+  require("code-review").setup({
+    -- Provider name override (auto-detected if nil)
+    provider = nil,
+
+    -- Default diff view mode: "split" or "unified"
+    diff_mode = "split",
+
+    -- Custom keymap overrides
+    keymaps = {
+      next_file = "]f",
+      prev_file = "[f",
+      next_comment = "]c",
+      prev_comment = "[c",
+      add_comment = "<leader>cc",
+      toggle_diff = "<leader>ct",
+    },
+  })
+<
+
+==============================================================================
+7. STATUSLINE                                      *code-review-statusline*
+
+Add review status to your statusline: >lua
+  -- lualine example
+  lualine_x = {
+    { require("code-review").statusline },
+  }
+<
+
+Output format: `PR #1 | file.lua [2/5] | 💬 3`
+
+==============================================================================
+8. PROVIDERS                                        *code-review-providers*
+
+Currently supported:
+- GitHub (via `gh` CLI)
+
+The provider is auto-detected from the git remote URL. Ensure you are
+authenticated with `gh auth login` before starting a review.
+
+To add a new provider, implement the interface in
+`lua/code-review/provider/your_provider.lua` with these methods:
+
+- `get_pr(owner, repo, branch)` → PR table or nil
+- `get_comments(owner, repo, pr_number)` → Comment list
+- `post_comment(owner, repo, pr_number, file, line, body, commit_id)` → Comment
+
+==============================================================================
+vim:tw=78:ts=8:ft=help:norl:
