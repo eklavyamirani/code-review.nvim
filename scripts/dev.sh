@@ -41,8 +41,11 @@ VOLUMES=("-v" "${PLUGIN_DIR}:/plugin")
 WORKDIR="/plugin"
 
 if [ -n "$TARGET" ] && [ "$TARGET" != "$PLUGIN_DIR" ]; then
-  VOLUMES+=("-v" "${TARGET}:/worktree")
-  WORKDIR="/worktree"
+  # Mount worktree at its original host path so .git file references resolve
+  VOLUMES+=("-v" "${TARGET}:${TARGET}")
+  # Also mount the main repo's .git at its host path (worktree .git files use absolute paths)
+  VOLUMES+=("-v" "${PLUGIN_DIR}/.git:${PLUGIN_DIR}/.git")
+  WORKDIR="${TARGET}"
 fi
 
 echo "Plugin:    ${PLUGIN_DIR}"
@@ -55,7 +58,7 @@ docker compose run --rm \
   -w "$WORKDIR" \
   dev \
   bash -c "
-    git config --global --add safe.directory /plugin 2>/dev/null
-    git config --global --add safe.directory /worktree 2>/dev/null
+    git config --global --add safe.directory '${PLUGIN_DIR}' 2>/dev/null
+    git config --global --add safe.directory '${TARGET:-${PLUGIN_DIR}}' 2>/dev/null
     nvim --cmd 'set runtimepath^=/plugin'
   "
