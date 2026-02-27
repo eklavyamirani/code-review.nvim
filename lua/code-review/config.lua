@@ -8,6 +8,7 @@ local M = {}
 local defaults = {
   provider = nil,
   diff_mode = "split",
+  file_picker = "auto", -- "auto", "netrw", "mini_files"
   keymaps = {
     next_file = "]f",
     prev_file = "[f",

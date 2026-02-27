@@ -15,7 +15,7 @@ function M.start()
   M.setup()
   local review = require("code-review.review")
   local diff_ui = require("code-review.ui.diff")
-  local file_list_ui = require("code-review.ui.file_list")
+  local file_picker = require("code-review.ui.file_picker")
 
   local session, err = review.start()
   if not session then
@@ -29,22 +29,32 @@ function M.start()
     vim.log.levels.INFO
   )
 
-  -- Open the first file's diff
-  local file_diff = review.current_file_diff()
-  if file_diff then
-    local comments = review.comments_for_file(file_diff.new_file)
-    diff_ui.open(file_diff, session.pr, comments, config.values.diff_mode)
-  end
-
   -- Setup keybindings for the session
   M._setup_keymaps(session)
+
+  -- Open file picker — selecting a file opens its diff
+  file_picker.open(session, function(file_path)
+    local file = review.goto_file_by_path(file_path)
+    if file then
+      local file_diff = review.current_file_diff()
+      if file_diff then
+        local comments = review.comments_for_file(file.path)
+        diff_ui.open(file_diff, session.pr, comments, config.values.diff_mode)
+      end
+    end
+  end)
 end
 
 --- Close the current review session
 function M.close()
   local review = require("code-review.review")
   local diff_ui = require("code-review.ui.diff")
+  local file_picker = require("code-review.ui.file_picker")
   diff_ui.close()
+  -- Clean up temp directory
+  if review.current and review.current._temp_dir then
+    file_picker.cleanup(review.current._temp_dir)
+  end
   review.close()
   vim.notify("code-review: Session closed", vim.log.levels.INFO)
 end
