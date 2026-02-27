@@ -85,6 +85,7 @@ function M.start(opts)
     comments = comments,
     current_file_idx = 1,
     active = true,
+    reviewed = {}, -- file path -> boolean (review status tracking)
   }
 
   M.current = session
@@ -312,6 +313,45 @@ function M.prev_comment()
   return nil, nil
 end
 
+--- Toggle review status for the current file
+---@return boolean|nil status New status, or nil if no session
+function M.toggle_reviewed()
+  if not M.current or not M.current.active then
+    return nil
+  end
+  local file = M.current_file()
+  if not file then return nil end
+  local current = M.current.reviewed[file.path] or false
+  M.current.reviewed[file.path] = not current
+  return not current
+end
+
+--- Get review status for a file
+---@param path string
+---@return boolean
+function M.is_reviewed(path)
+  if not M.current or not M.current.active then
+    return false
+  end
+  return M.current.reviewed[path] or false
+end
+
+--- Get review progress
+---@return number reviewed Count of reviewed files
+---@return number total Total files
+function M.review_progress()
+  if not M.current or not M.current.active then
+    return 0, 0
+  end
+  local reviewed = 0
+  for _, f in ipairs(M.current.files) do
+    if M.current.reviewed[f.path] then
+      reviewed = reviewed + 1
+    end
+  end
+  return reviewed, #M.current.files
+end
+
 --- Get file list summary for display
 ---@return table[] List of {path, status, has_comments, is_current}
 function M.file_list()
@@ -329,6 +369,7 @@ function M.file_list()
       status = f.status,
       has_comments = comment_paths[f.path] or false,
       is_current = i == M.current.current_file_idx,
+      reviewed = M.current.reviewed[f.path] or false,
     })
   end
   return result

@@ -319,6 +319,18 @@ function M.reply_comment()
   end)
 end
 
+--- Toggle file review status
+function M.toggle_reviewed()
+  local review = require("code-review.review")
+  if not review.current then return end
+  local status = review.toggle_reviewed()
+  if status ~= nil then
+    local file = review.current_file()
+    local label = status and "✓ reviewed" or "· pending"
+    vim.notify("code-review: " .. (file and file.path or "file") .. " — " .. label, vim.log.levels.INFO)
+  end
+end
+
 --- Get statusline component
 ---@return string
 function M.statusline()
@@ -329,8 +341,9 @@ function M.statusline()
   local s = review.current
   local file = review.current_file()
   local file_name = file and vim.fn.fnamemodify(file.path, ":t") or "?"
-  return string.format("PR #%d | %s [%d/%d] | 💬 %d",
-    s.pr.number, file_name, s.current_file_idx, #s.files, #s.comments)
+  local reviewed, total = review.review_progress()
+  return string.format("PR #%d | %s [%d/%d] | 💬 %d | ✓ %d/%d",
+    s.pr.number, file_name, s.current_file_idx, #s.files, #s.comments, reviewed, total)
 end
 
 --- Setup keymaps for the review session
@@ -348,6 +361,7 @@ function M._setup_keymaps(_session)
   vim.keymap.set("n", km.next_hunk, M.next_hunk, vim.tbl_extend("force", opts, { desc = "Next hunk" }))
   vim.keymap.set("n", km.prev_hunk, M.prev_hunk, vim.tbl_extend("force", opts, { desc = "Previous hunk" }))
   vim.keymap.set("n", km.reply_comment, M.reply_comment, vim.tbl_extend("force", opts, { desc = "Reply to comment" }))
+  vim.keymap.set("n", km.toggle_reviewed, M.toggle_reviewed, vim.tbl_extend("force", opts, { desc = "Toggle file reviewed" }))
 end
 
 return M
