@@ -95,6 +95,10 @@ require("code-review").setup({
   -- Default diff view mode: "split" or "unified"
   diff_mode = "split",
 
+  -- File picker for browsing changed files: "auto", "netrw", "mini_files"
+  -- "auto" prefers mini.files if installed, falls back to netrw
+  file_picker = "auto",
+
   -- Custom keymap overrides
   keymaps = {
     next_file = "]f",
