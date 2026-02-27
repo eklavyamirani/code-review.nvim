@@ -10,3 +10,7 @@ end, { desc = "Start a code review session" })
 vim.api.nvim_create_user_command("CodeReviewClose", function()
   require("code-review").close()
 end, { desc = "Close the code review session" })
+
+vim.api.nvim_create_user_command("CodeReviewSubmit", function()
+  require("code-review").submit_review()
+end, { desc = "Submit a PR review (approve/request changes/comment)" })

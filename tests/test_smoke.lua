@@ -57,6 +57,12 @@ suite["public API has expected functions"] = function()
   expect.equality(type(cr.toggle_diff), "function")
   expect.equality(type(cr.add_comment), "function")
   expect.equality(type(cr.statusline), "function")
+  expect.equality(type(cr.next_comment), "function")
+  expect.equality(type(cr.prev_comment), "function")
+  expect.equality(type(cr.next_hunk), "function")
+  expect.equality(type(cr.prev_hunk), "function")
+  expect.equality(type(cr.reply_comment), "function")
+  expect.equality(type(cr.submit_review), "function")
 end
 
 return suite

@@ -104,4 +104,14 @@ suite["detect returns nil for unknown hosts"] = function()
   expect.equality(prov, nil)
 end
 
+suite["github provider has submit_review method"] = function()
+  local github = require("code-review.provider.github")
+  expect.equality(type(github.submit_review), "function")
+end
+
+suite["github provider has reply_to_comment method"] = function()
+  local github = require("code-review.provider.github")
+  expect.equality(type(github.reply_to_comment), "function")
+end
+
 return suite

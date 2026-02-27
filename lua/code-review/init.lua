@@ -192,6 +192,83 @@ function M.prev_hunk()
   diff_ui.prev_hunk()
 end
 
+--- Submit a PR review (approve, request changes, or comment)
+function M.submit_review()
+  local review = require("code-review.review")
+  if not review.current then
+    vim.notify("code-review: No active review session", vim.log.levels.WARN)
+    return
+  end
+
+  local choices = { "APPROVE", "REQUEST_CHANGES", "COMMENT" }
+  vim.ui.select(choices, { prompt = "Review type:" }, function(choice)
+    if not choice then return end
+
+    -- Open a floating window for the review body
+    local comments_ui = require("code-review.ui.comments")
+    local buf = vim.api.nvim_create_buf(false, true)
+    vim.bo[buf].filetype = "markdown"
+    vim.bo[buf].bufhidden = "wipe"
+
+    vim.api.nvim_buf_set_lines(buf, 0, -1, false, {
+      "<!-- " .. choice .. " review for PR #" .. review.current.pr.number .. " -->",
+      "<!-- Write your review summary below, then press <leader>cs to submit -->",
+      "",
+    })
+
+    local width = math.min(80, math.floor(vim.o.columns * 0.6))
+    local height = math.min(10, math.floor(vim.o.lines * 0.3))
+    local win = vim.api.nvim_open_win(buf, true, {
+      relative = "editor",
+      row = math.floor((vim.o.lines - height) / 2),
+      col = math.floor((vim.o.columns - width) / 2),
+      width = width,
+      height = height,
+      style = "minimal",
+      border = "rounded",
+      title = " 📝 " .. choice .. " Review ",
+      title_pos = "center",
+    })
+
+    vim.api.nvim_win_set_cursor(win, { 3, 0 })
+    vim.cmd("startinsert")
+
+    vim.keymap.set("n", "<leader>cs", function()
+      local lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
+      local body_lines = {}
+      for _, line in ipairs(lines) do
+        if not line:match("^<!%-%-") then
+          table.insert(body_lines, line)
+        end
+      end
+      local body = vim.trim(table.concat(body_lines, "\n"))
+      vim.api.nvim_win_close(win, true)
+
+      local provider = review.current.provider
+      if provider.submit_review then
+        local result, err = provider.submit_review(
+          review.current.owner, review.current.repo,
+          review.current.pr.number, choice, body
+        )
+        if result then
+          vim.notify("Review submitted: " .. choice, vim.log.levels.INFO)
+        else
+          vim.notify("Failed to submit review: " .. (err or "unknown"), vim.log.levels.ERROR)
+        end
+      else
+        vim.notify("code-review: Provider does not support review submission", vim.log.levels.WARN)
+      end
+    end, { buffer = buf, desc = "Submit review" })
+
+    vim.keymap.set("n", "q", function()
+      vim.api.nvim_win_close(win, true)
+    end, { buffer = buf, desc = "Cancel review" })
+    vim.keymap.set("n", "<Esc>", function()
+      vim.api.nvim_win_close(win, true)
+    end, { buffer = buf, desc = "Cancel review" })
+  end)
+end
+
 --- Reply to the comment at/near the current cursor position
 function M.reply_comment()
   local review = require("code-review.review")
