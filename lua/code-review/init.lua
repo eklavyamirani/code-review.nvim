@@ -319,6 +319,30 @@ function M.reply_comment()
   end)
 end
 
+--- Refresh the current session
+function M.refresh()
+  local review = require("code-review.review")
+  local diff_ui = require("code-review.ui.diff")
+  if not review.current then
+    vim.notify("code-review: No active review session", vim.log.levels.WARN)
+    return
+  end
+
+  local ok, err = review.refresh()
+  if ok then
+    -- Re-render the current file diff
+    local file_diff = review.current_file_diff()
+    if file_diff then
+      local file = review.current_file()
+      local comments = file and review.comments_for_file(file.path) or {}
+      diff_ui.open(file_diff, review.current.pr, comments)
+    end
+    vim.notify("code-review: Session refreshed", vim.log.levels.INFO)
+  else
+    vim.notify("code-review: " .. (err or "Failed to refresh"), vim.log.levels.ERROR)
+  end
+end
+
 --- Toggle file review status
 function M.toggle_reviewed()
   local review = require("code-review.review")

@@ -324,4 +324,12 @@ suite["review.file_list includes reviewed indicator"] = function()
   expect.equality(list[2].reviewed, false)
 end
 
+suite["review.refresh returns error when no session"] = function()
+  local review = require("code-review.review")
+  review.current = nil
+  local ok, err = review.refresh()
+  expect.equality(ok, false)
+  assert(err:match("No active"), "Expected no active session error")
+end
+
 return suite

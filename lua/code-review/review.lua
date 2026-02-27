@@ -92,6 +92,74 @@ function M.start(opts)
   return session, nil
 end
 
+--- Refresh the current session (re-fetch PR data, diff, comments)
+--- Preserves cursor position and file review status
+---@return boolean success
+---@return string|nil error
+function M.refresh()
+  if not M.current or not M.current.active then
+    return false, "No active session to refresh"
+  end
+
+  local s = M.current
+
+  -- Re-fetch PR metadata
+  local pr, err = s.provider.get_pr(s.owner, s.repo, s.pr.head_ref)
+  if not pr then
+    return false, err or "Failed to refresh PR"
+  end
+
+  -- Re-fetch diff
+  local raw_diff = git.diff(pr.base_ref, pr.head_ref)
+  local parsed_files = diff_parser.parse(raw_diff)
+  local file_diffs = {}
+  for _, fd in ipairs(parsed_files) do
+    file_diffs[fd.new_file] = fd
+  end
+
+  -- Re-fetch files
+  local files = git.changed_files(pr.base_ref, pr.head_ref)
+
+  -- Re-fetch comments
+  local comments = {}
+  comments, err = s.provider.get_comments(s.owner, s.repo, pr.number)
+  if err then
+    vim.notify("code-review: failed to refresh comments: " .. err, vim.log.levels.WARN)
+    comments = s.comments -- keep old comments
+  end
+
+  -- Preserve review status and cursor position
+  local old_reviewed = s.reviewed
+  local old_file_idx = s.current_file_idx
+  local old_file = s.files[old_file_idx]
+
+  -- Update session
+  s.pr = pr
+  s.files = files
+  s.file_diffs = file_diffs
+  s.comments = comments
+  s.reviewed = old_reviewed
+
+  -- Restore file position (try to find same file)
+  if old_file then
+    local found = false
+    for i, f in ipairs(files) do
+      if f.path == old_file.path then
+        s.current_file_idx = i
+        found = true
+        break
+      end
+    end
+    if not found then
+      s.current_file_idx = math.min(old_file_idx, #files)
+    end
+  else
+    s.current_file_idx = 1
+  end
+
+  return true, nil
+end
+
 --- Close the current review session
 function M.close()
   if M.current then
