@@ -119,6 +119,67 @@ function M.add_comment()
   end)
 end
 
+--- Navigate to the next comment
+function M.next_comment()
+  local review = require("code-review.review")
+  local diff_ui = require("code-review.ui.diff")
+  if not review.current then return end
+
+  local comment, file = review.next_comment()
+  if comment and file then
+    -- If we switched files, open the new file's diff
+    local cur_file = review.current_file()
+    if cur_file and cur_file.path == file.path then
+      local file_diff = review.current_file_diff()
+      if file_diff then
+        -- Check if we need to reopen the diff (file changed)
+        if diff_ui.state.file_path ~= file.path then
+          local comments = review.comments_for_file(file.path)
+          diff_ui.open(file_diff, review.current.pr, comments)
+        end
+        -- Move cursor to the comment line
+        if #diff_ui.state.wins > 0 and vim.api.nvim_win_is_valid(diff_ui.state.wins[#diff_ui.state.wins]) then
+          local win = diff_ui.state.wins[#diff_ui.state.wins]
+          local max_line = vim.api.nvim_buf_line_count(vim.api.nvim_win_get_buf(win))
+          local target = math.min(comment.line, max_line)
+          pcall(vim.api.nvim_win_set_cursor, win, { target, 0 })
+        end
+      end
+    end
+  else
+    vim.notify("code-review: No more comments", vim.log.levels.INFO)
+  end
+end
+
+--- Navigate to the previous comment
+function M.prev_comment()
+  local review = require("code-review.review")
+  local diff_ui = require("code-review.ui.diff")
+  if not review.current then return end
+
+  local comment, file = review.prev_comment()
+  if comment and file then
+    local cur_file = review.current_file()
+    if cur_file and cur_file.path == file.path then
+      local file_diff = review.current_file_diff()
+      if file_diff then
+        if diff_ui.state.file_path ~= file.path then
+          local comments = review.comments_for_file(file.path)
+          diff_ui.open(file_diff, review.current.pr, comments)
+        end
+        if #diff_ui.state.wins > 0 and vim.api.nvim_win_is_valid(diff_ui.state.wins[#diff_ui.state.wins]) then
+          local win = diff_ui.state.wins[#diff_ui.state.wins]
+          local max_line = vim.api.nvim_buf_line_count(vim.api.nvim_win_get_buf(win))
+          local target = math.min(comment.line, max_line)
+          pcall(vim.api.nvim_win_set_cursor, win, { target, 0 })
+        end
+      end
+    end
+  else
+    vim.notify("code-review: No more comments", vim.log.levels.INFO)
+  end
+end
+
 --- Get statusline component
 ---@return string
 function M.statusline()
@@ -143,6 +204,8 @@ function M._setup_keymaps(_session)
   vim.keymap.set("n", km.prev_file, M.prev_file, vim.tbl_extend("force", opts, { desc = "Previous file" }))
   vim.keymap.set("n", km.toggle_diff, M.toggle_diff, vim.tbl_extend("force", opts, { desc = "Toggle diff mode" }))
   vim.keymap.set("n", km.add_comment, M.add_comment, vim.tbl_extend("force", opts, { desc = "Add comment" }))
+  vim.keymap.set("n", km.next_comment, M.next_comment, vim.tbl_extend("force", opts, { desc = "Next comment" }))
+  vim.keymap.set("n", km.prev_comment, M.prev_comment, vim.tbl_extend("force", opts, { desc = "Previous comment" }))
 end
 
 return M

@@ -187,6 +187,131 @@ function M.comments_for_file(path)
   return result
 end
 
+--- Navigate to the next comment (within file, then cross-file)
+---@return Comment|nil comment The next comment, or nil
+---@return table|nil file The file containing the comment
+function M.next_comment()
+  if not M.current or not M.current.active then
+    return nil, nil
+  end
+  local comments = M.current.comments
+  if #comments == 0 then
+    return nil, nil
+  end
+
+  local cur_file = M.current_file()
+  if not cur_file then return nil, nil end
+
+  -- Get cursor line in current diff buffer
+  local cursor_line = 1
+  if vim.api.nvim_get_current_win() and vim.api.nvim_win_is_valid(vim.api.nvim_get_current_win()) then
+    cursor_line = vim.api.nvim_win_get_cursor(vim.api.nvim_get_current_win())[1]
+  end
+
+  -- Sort comments for current file by line
+  local file_comments = {}
+  for _, c in ipairs(comments) do
+    if c.path == cur_file.path and c.line then
+      table.insert(file_comments, c)
+    end
+  end
+  table.sort(file_comments, function(a, b) return a.line < b.line end)
+
+  -- Find next comment in current file after cursor
+  for _, c in ipairs(file_comments) do
+    if c.line > cursor_line then
+      return c, cur_file
+    end
+  end
+
+  -- No more in current file — search subsequent files
+  local n = #M.current.files
+  for offset = 1, n - 1 do
+    local idx = ((M.current.current_file_idx - 1 + offset) % n) + 1
+    local f = M.current.files[idx]
+    local fc = {}
+    for _, c in ipairs(comments) do
+      if c.path == f.path and c.line then
+        table.insert(fc, c)
+      end
+    end
+    if #fc > 0 then
+      table.sort(fc, function(a, b) return a.line < b.line end)
+      M.current.current_file_idx = idx
+      return fc[1], f
+    end
+  end
+
+  -- Wrap: return first comment in current file
+  if #file_comments > 0 then
+    return file_comments[1], cur_file
+  end
+
+  return nil, nil
+end
+
+--- Navigate to the previous comment (within file, then cross-file)
+---@return Comment|nil comment The previous comment, or nil
+---@return table|nil file The file containing the comment
+function M.prev_comment()
+  if not M.current or not M.current.active then
+    return nil, nil
+  end
+  local comments = M.current.comments
+  if #comments == 0 then
+    return nil, nil
+  end
+
+  local cur_file = M.current_file()
+  if not cur_file then return nil, nil end
+
+  local cursor_line = 1
+  if vim.api.nvim_get_current_win() and vim.api.nvim_win_is_valid(vim.api.nvim_get_current_win()) then
+    cursor_line = vim.api.nvim_win_get_cursor(vim.api.nvim_get_current_win())[1]
+  end
+
+  -- Sort comments for current file by line (descending)
+  local file_comments = {}
+  for _, c in ipairs(comments) do
+    if c.path == cur_file.path and c.line then
+      table.insert(file_comments, c)
+    end
+  end
+  table.sort(file_comments, function(a, b) return a.line > b.line end)
+
+  -- Find previous comment in current file before cursor
+  for _, c in ipairs(file_comments) do
+    if c.line < cursor_line then
+      return c, cur_file
+    end
+  end
+
+  -- No more in current file — search preceding files
+  local n = #M.current.files
+  for offset = 1, n - 1 do
+    local idx = ((M.current.current_file_idx - 1 - offset) % n) + 1
+    local f = M.current.files[idx]
+    local fc = {}
+    for _, c in ipairs(comments) do
+      if c.path == f.path and c.line then
+        table.insert(fc, c)
+      end
+    end
+    if #fc > 0 then
+      table.sort(fc, function(a, b) return a.line > b.line end)
+      M.current.current_file_idx = idx
+      return fc[1], f
+    end
+  end
+
+  -- Wrap: return last comment in current file
+  if #file_comments > 0 then
+    return file_comments[1], cur_file  -- already sorted descending, so [1] is last
+  end
+
+  return nil, nil
+end
+
 --- Get file list summary for display
 ---@return table[] List of {path, status, has_comments, is_current}
 function M.file_list()
