@@ -130,4 +130,34 @@ function M.post_comment(owner, repo, pr_number, file, line, body, commit_id)
   }, nil
 end
 
+--- Reply to a review comment on a PR
+---@param owner string
+---@param repo string
+---@param pr_number number
+---@param comment_id number The ID of the comment to reply to
+---@param body string Reply body
+---@return Comment|nil comment
+---@return string|nil error
+function M.reply_to_comment(owner, repo, pr_number, comment_id, body)
+  local data, err = gh_api(
+    "repos/" .. owner .. "/" .. repo .. "/pulls/" .. pr_number .. "/comments/" .. comment_id .. "/replies",
+    "POST",
+    { body = body }
+  )
+  if err then
+    return nil, err
+  end
+
+  return {
+    id = data.id,
+    body = data.body,
+    path = data.path,
+    line = data.line or data.original_line,
+    side = data.side or "RIGHT",
+    author = data.user.login,
+    created_at = data.created_at,
+    in_reply_to = data.in_reply_to_id,
+  }, nil
+end
+
 return M

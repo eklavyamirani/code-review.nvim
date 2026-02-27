@@ -192,6 +192,56 @@ function M.prev_hunk()
   diff_ui.prev_hunk()
 end
 
+--- Reply to the comment at/near the current cursor position
+function M.reply_comment()
+  local review = require("code-review.review")
+  local comments_ui = require("code-review.ui.comments")
+  if not review.current then
+    vim.notify("code-review: No active review session", vim.log.levels.WARN)
+    return
+  end
+
+  local file = review.current_file()
+  if not file then return end
+
+  local cursor = vim.api.nvim_win_get_cursor(0)
+  local line_num = cursor[1]
+
+  -- Find the nearest comment at or before the cursor line
+  local file_comments = review.comments_for_file(file.path)
+  local nearest = nil
+  for _, c in ipairs(file_comments) do
+    if c.line and c.line <= line_num and not c.in_reply_to then
+      if not nearest or c.line > nearest.line then
+        nearest = c
+      end
+    end
+  end
+
+  if not nearest then
+    vim.notify("code-review: No comment found near cursor to reply to", vim.log.levels.WARN)
+    return
+  end
+
+  comments_ui.open_input(file.path, nearest.line, function(body)
+    local provider = review.current.provider
+    if provider.reply_to_comment then
+      local comment, err = provider.reply_to_comment(
+        review.current.owner, review.current.repo,
+        review.current.pr.number, nearest.id, body
+      )
+      if comment then
+        table.insert(review.current.comments, comment)
+        vim.notify("Reply posted successfully", vim.log.levels.INFO)
+      else
+        vim.notify("Failed to post reply: " .. (err or "unknown"), vim.log.levels.ERROR)
+      end
+    else
+      vim.notify("code-review: Provider does not support reply", vim.log.levels.WARN)
+    end
+  end)
+end
+
 --- Get statusline component
 ---@return string
 function M.statusline()
@@ -220,6 +270,7 @@ function M._setup_keymaps(_session)
   vim.keymap.set("n", km.prev_comment, M.prev_comment, vim.tbl_extend("force", opts, { desc = "Previous comment" }))
   vim.keymap.set("n", km.next_hunk, M.next_hunk, vim.tbl_extend("force", opts, { desc = "Next hunk" }))
   vim.keymap.set("n", km.prev_hunk, M.prev_hunk, vim.tbl_extend("force", opts, { desc = "Previous hunk" }))
+  vim.keymap.set("n", km.reply_comment, M.reply_comment, vim.tbl_extend("force", opts, { desc = "Reply to comment" }))
 end
 
 return M

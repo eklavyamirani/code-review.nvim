@@ -18,6 +18,7 @@ local defaults = {
     toggle_diff = "<leader>ct",
     next_hunk = "]h",
     prev_hunk = "[h",
+    reply_comment = "<leader>cr",
   },
 }
 
