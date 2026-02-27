@@ -16,6 +16,8 @@ local defaults = {
     prev_comment = "[c",
     add_comment = "<leader>cc",
     toggle_diff = "<leader>ct",
+    next_hunk = "]h",
+    prev_hunk = "[h",
   },
 }
 

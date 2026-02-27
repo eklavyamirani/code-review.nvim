@@ -11,6 +11,7 @@ M.state = {
   wins = {},      -- list of window IDs
   file_path = nil,
   cursor_line = 1,
+  hunk_positions = {}, -- list of {line} positions in the current buffer(s) where hunks start
 }
 
 --- Render a unified diff view for a file
@@ -20,6 +21,7 @@ M.state = {
 function M.render_unified(file_diff, comments)
   local lines = {}
   local highlights = {} -- {line_idx, hl_group}
+  local hunk_positions = {}
 
   -- Header
   table.insert(lines, "--- " .. file_diff.old_file)
@@ -41,6 +43,7 @@ function M.render_unified(file_diff, comments)
   for _, hunk in ipairs(file_diff.hunks) do
     table.insert(lines, hunk.header)
     table.insert(highlights, { #lines, "CodeReviewHunkHeader" })
+    table.insert(hunk_positions, #lines)  -- 1-based line number of hunk header
 
     for _, dl in ipairs(hunk.lines) do
       local prefix = " "
@@ -76,7 +79,7 @@ function M.render_unified(file_diff, comments)
     vim.api.nvim_buf_add_highlight(buf, ui.ns, hl[2], hl[1] - 1, 0, -1)
   end
 
-  return buf
+  return buf, hunk_positions
 end
 
 --- Render side-by-side diff view for a file
@@ -103,10 +106,13 @@ function M.render_split(file_diff, pr_base_ref, pr_head_ref, comments)
   ui.set_lines(left_buf, old_lines)
   ui.set_lines(right_buf, new_lines)
 
-  -- Highlight changed lines using hunk data
+  -- Highlight changed lines and track hunk positions
   local removed_lines = {}
   local added_lines = {}
+  local hunk_positions = {}
   for _, hunk in ipairs(file_diff.hunks) do
+    -- Track the start position of each hunk in the right (new) buffer
+    table.insert(hunk_positions, hunk.new_start)
     for _, dl in ipairs(hunk.lines) do
       if dl.type == "remove" and dl.old_line then
         removed_lines[dl.old_line] = true
@@ -140,7 +146,7 @@ function M.render_split(file_diff, pr_base_ref, pr_head_ref, comments)
     end
   end
 
-  return left_buf, right_buf
+  return left_buf, right_buf, hunk_positions
 end
 
 --- Open the diff view in the current tab
@@ -156,14 +162,15 @@ function M.open(file_diff, pr, comments, mode)
   M.state.file_path = file_diff.new_file
 
   if mode == "unified" then
-    local buf = M.render_unified(file_diff, comments)
+    local buf, hunk_positions = M.render_unified(file_diff, comments)
     vim.cmd("tabnew")
     local win = vim.api.nvim_get_current_win()
     vim.api.nvim_win_set_buf(win, buf)
     M.state.bufs = { buf }
     M.state.wins = { win }
+    M.state.hunk_positions = hunk_positions
   else
-    local left_buf, right_buf = M.render_split(file_diff, pr.base_ref, pr.head_ref, comments)
+    local left_buf, right_buf, hunk_positions = M.render_split(file_diff, pr.base_ref, pr.head_ref, comments)
     vim.cmd("tabnew")
     local left_win = vim.api.nvim_get_current_win()
     vim.api.nvim_win_set_buf(left_win, left_buf)
@@ -181,7 +188,71 @@ function M.open(file_diff, pr, comments, mode)
 
     M.state.bufs = { left_buf, right_buf }
     M.state.wins = { left_win, right_win }
+    M.state.hunk_positions = hunk_positions
   end
+end
+
+--- Navigate to the next hunk in the current diff buffer
+---@return number|nil line The line number jumped to
+function M.next_hunk()
+  if #M.state.hunk_positions == 0 then return nil end
+  local cursor_line = 1
+  if #M.state.wins > 0 and vim.api.nvim_win_is_valid(M.state.wins[#M.state.wins]) then
+    cursor_line = vim.api.nvim_win_get_cursor(M.state.wins[#M.state.wins])[1]
+  end
+
+  -- Find next hunk after cursor
+  for _, pos in ipairs(M.state.hunk_positions) do
+    if pos > cursor_line then
+      for _, win in ipairs(M.state.wins) do
+        if vim.api.nvim_win_is_valid(win) then
+          pcall(vim.api.nvim_win_set_cursor, win, { pos, 0 })
+        end
+      end
+      return pos
+    end
+  end
+
+  -- Wrap to first hunk
+  local pos = M.state.hunk_positions[1]
+  for _, win in ipairs(M.state.wins) do
+    if vim.api.nvim_win_is_valid(win) then
+      pcall(vim.api.nvim_win_set_cursor, win, { pos, 0 })
+    end
+  end
+  return pos
+end
+
+--- Navigate to the previous hunk in the current diff buffer
+---@return number|nil line The line number jumped to
+function M.prev_hunk()
+  if #M.state.hunk_positions == 0 then return nil end
+  local cursor_line = 1
+  if #M.state.wins > 0 and vim.api.nvim_win_is_valid(M.state.wins[#M.state.wins]) then
+    cursor_line = vim.api.nvim_win_get_cursor(M.state.wins[#M.state.wins])[1]
+  end
+
+  -- Find previous hunk before cursor
+  for i = #M.state.hunk_positions, 1, -1 do
+    local pos = M.state.hunk_positions[i]
+    if pos < cursor_line then
+      for _, win in ipairs(M.state.wins) do
+        if vim.api.nvim_win_is_valid(win) then
+          pcall(vim.api.nvim_win_set_cursor, win, { pos, 0 })
+        end
+      end
+      return pos
+    end
+  end
+
+  -- Wrap to last hunk
+  local pos = M.state.hunk_positions[#M.state.hunk_positions]
+  for _, win in ipairs(M.state.wins) do
+    if vim.api.nvim_win_is_valid(win) then
+      pcall(vim.api.nvim_win_set_cursor, win, { pos, 0 })
+    end
+  end
+  return pos
 end
 
 --- Close the current diff view

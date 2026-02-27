@@ -180,6 +180,18 @@ function M.prev_comment()
   end
 end
 
+--- Navigate to the next hunk
+function M.next_hunk()
+  local diff_ui = require("code-review.ui.diff")
+  diff_ui.next_hunk()
+end
+
+--- Navigate to the previous hunk
+function M.prev_hunk()
+  local diff_ui = require("code-review.ui.diff")
+  diff_ui.prev_hunk()
+end
+
 --- Get statusline component
 ---@return string
 function M.statusline()
@@ -206,6 +218,8 @@ function M._setup_keymaps(_session)
   vim.keymap.set("n", km.add_comment, M.add_comment, vim.tbl_extend("force", opts, { desc = "Add comment" }))
   vim.keymap.set("n", km.next_comment, M.next_comment, vim.tbl_extend("force", opts, { desc = "Next comment" }))
   vim.keymap.set("n", km.prev_comment, M.prev_comment, vim.tbl_extend("force", opts, { desc = "Previous comment" }))
+  vim.keymap.set("n", km.next_hunk, M.next_hunk, vim.tbl_extend("force", opts, { desc = "Next hunk" }))
+  vim.keymap.set("n", km.prev_hunk, M.prev_hunk, vim.tbl_extend("force", opts, { desc = "Previous hunk" }))
 end
 
 return M
