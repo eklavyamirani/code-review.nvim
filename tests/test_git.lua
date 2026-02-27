@@ -37,14 +37,14 @@ suite["git.parse_remote handles SSH URLs"] = function()
   local git = require("code-review.git")
   local owner, repo = git.parse_remote("git@github.com:eklavyamirani/code-review.nvim.git")
   expect.equality(owner, "eklavyamirani")
-  expect.equality(repo, "code-review")
+  expect.equality(repo, "code-review.nvim")
 end
 
 suite["git.parse_remote handles HTTPS URLs"] = function()
   local git = require("code-review.git")
   local owner, repo = git.parse_remote("https://github.com/eklavyamirani/code-review.nvim.git")
   expect.equality(owner, "eklavyamirani")
-  expect.equality(repo, "code-review")
+  expect.equality(repo, "code-review.nvim")
 end
 
 suite["git.remote_host extracts hostname from SSH"] = function()

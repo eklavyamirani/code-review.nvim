@@ -94,8 +94,7 @@ suite["detect finds github provider for this repo"] = function()
   expect.no_equality(prov, nil)
   expect.equality(prov.name, "github")
   expect.equality(owner, "eklavyamirani")
-  -- parse_remote strips .nvim from the repo name at the .git boundary
-  expect.no_equality(repo, nil)
+  expect.equality(repo, "code-review.nvim")
 end
 
 suite["detect returns nil for unknown hosts"] = function()
