@@ -33,3 +33,18 @@ vim.api.nvim_create_user_command("CodeReviewSet", function(opts)
   local value = table.concat(vim.list_slice(args, 2), " ")
   require("code-review").set_config(key, value)
 end, { desc = "Set a config value at runtime", nargs = "+" })
+
+vim.api.nvim_create_user_command("CodeReviewCheckout", function(opts)
+  local ref_type = opts.args
+  if ref_type ~= "base" and ref_type ~= "head" then
+    vim.notify("Usage: :CodeReviewCheckout base|head", vim.log.levels.WARN)
+    return
+  end
+  require("code-review").checkout_file(ref_type)
+end, { desc = "Open current file at base or head ref", nargs = 1, complete = function()
+  return { "base", "head" }
+end })
+
+vim.api.nvim_create_user_command("CodeReviewInfo", function()
+  require("code-review").show_pr_info()
+end, { desc = "Show PR description and metadata" })

@@ -404,6 +404,111 @@ function M.ask_ai()
   end)
 end
 
+--- Open file at a specific ref (base or head) in a new buffer
+---@param ref_type "base"|"head"
+function M.checkout_file(ref_type)
+  local review = require("code-review.review")
+  local git_mod = require("code-review.git")
+  if not review.current then
+    vim.notify("code-review: No active review session", vim.log.levels.WARN)
+    return
+  end
+
+  local file = review.current_file()
+  if not file then
+    vim.notify("code-review: No current file", vim.log.levels.WARN)
+    return
+  end
+
+  local ref = ref_type == "base" and review.current.pr.base_ref or review.current.pr.head_ref
+  local content = git_mod.file_at_ref(ref, file.path)
+  if not content then
+    vim.notify("code-review: File not found at " .. ref, vim.log.levels.ERROR)
+    return
+  end
+
+  local buf = vim.api.nvim_create_buf(true, false)
+  local ext = file.path:match("%.(%w+)$")
+  local ft = ext and vim.filetype.match({ filename = "file." .. ext }) or ""
+  vim.api.nvim_buf_set_name(buf, "[CodeReview] " .. file.path .. " (" .. ref_type .. ":" .. ref .. ")")
+  vim.api.nvim_buf_set_lines(buf, 0, -1, false, vim.split(content, "\n", { plain = true }))
+  if ft and ft ~= "" then
+    vim.bo[buf].filetype = ft
+  end
+
+  vim.cmd("tabnew")
+  vim.api.nvim_win_set_buf(0, buf)
+end
+
+--- Show PR description/info in a floating window
+function M.show_pr_info()
+  local review = require("code-review.review")
+  if not review.current then
+    vim.notify("code-review: No active review session", vim.log.levels.WARN)
+    return
+  end
+
+  local pr = review.current.pr
+  local lines = {
+    "# " .. pr.title,
+    "",
+    "**PR #" .. pr.number .. "** by " .. pr.author,
+    "**URL:** " .. pr.url,
+    "**Base:** " .. pr.base_ref .. " ← **Head:** " .. pr.head_ref,
+    "",
+    "---",
+    "",
+  }
+
+  -- Add PR body
+  local body = pr.body or ""
+  if body ~= "" then
+    for _, line in ipairs(vim.split(body, "\n", { plain = true })) do
+      table.insert(lines, line)
+    end
+  else
+    table.insert(lines, "*No description provided.*")
+  end
+
+  -- Add file summary
+  table.insert(lines, "")
+  table.insert(lines, "---")
+  table.insert(lines, "")
+  table.insert(lines, "## Changed Files (" .. #review.current.files .. ")")
+  table.insert(lines, "")
+  for _, f in ipairs(review.current.files) do
+    local status_icon = f.status == "A" and "+" or (f.status == "D" and "−" or "~")
+    table.insert(lines, "  " .. status_icon .. " " .. f.path)
+  end
+
+  local buf = vim.api.nvim_create_buf(false, true)
+  vim.bo[buf].filetype = "markdown"
+  vim.bo[buf].bufhidden = "wipe"
+  vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
+  vim.bo[buf].modifiable = false
+
+  local width = math.min(100, math.floor(vim.o.columns * 0.8))
+  local height = math.min(30, math.max(10, #lines))
+  local win = vim.api.nvim_open_win(buf, true, {
+    relative = "editor",
+    row = math.floor((vim.o.lines - height) / 2),
+    col = math.floor((vim.o.columns - width) / 2),
+    width = width,
+    height = height,
+    style = "minimal",
+    border = "rounded",
+    title = " 📋 PR #" .. pr.number .. " ",
+    title_pos = "center",
+  })
+
+  vim.keymap.set("n", "q", function()
+    vim.api.nvim_win_close(win, true)
+  end, { buffer = buf, desc = "Close PR info" })
+  vim.keymap.set("n", "<Esc>", function()
+    vim.api.nvim_win_close(win, true)
+  end, { buffer = buf, desc = "Close PR info" })
+end
+
 --- Set a config value at runtime
 function M.set_config(key, value)
   config.set(key, value)

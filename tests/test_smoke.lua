@@ -81,6 +81,8 @@ suite["public API has expected functions"] = function()
   expect.equality(type(cr.refresh), "function")
   expect.equality(type(cr.ask_ai), "function")
   expect.equality(type(cr.set_config), "function")
+  expect.equality(type(cr.checkout_file), "function")
+  expect.equality(type(cr.show_pr_info), "function")
 end
 
 return suite
