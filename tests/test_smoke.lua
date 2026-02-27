@@ -25,6 +25,18 @@ suite["setup merges user config"] = function()
   expect.equality(config.values.diff_mode, "unified")
 end
 
+suite["config.set changes values at runtime"] = function()
+  local cr = require("code-review")
+  cr.setup()
+  local config = require("code-review.config")
+
+  config.set("ai.cmd", "claude -p")
+  expect.equality(config.values.ai.cmd, "claude -p")
+
+  config.set("diff_mode", "unified")
+  expect.equality(config.values.diff_mode, "unified")
+end
+
 suite["default config has expected values"] = function()
   local cr = require("code-review")
   cr.setup()
@@ -33,6 +45,8 @@ suite["default config has expected values"] = function()
   expect.equality(config.values.diff_mode, "split")
   expect.equality(config.values.provider, nil)
   expect.equality(config.values.keymaps.next_file, "]f")
+  expect.equality(config.values.ai.cmd, nil)
+  expect.equality(config.values.ai.context, "file")
 end
 
 suite["utils.system runs commands"] = function()
@@ -65,6 +79,8 @@ suite["public API has expected functions"] = function()
   expect.equality(type(cr.submit_review), "function")
   expect.equality(type(cr.toggle_reviewed), "function")
   expect.equality(type(cr.refresh), "function")
+  expect.equality(type(cr.ask_ai), "function")
+  expect.equality(type(cr.set_config), "function")
 end
 
 return suite

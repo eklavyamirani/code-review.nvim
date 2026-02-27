@@ -9,6 +9,10 @@ local defaults = {
   provider = nil,
   diff_mode = "split",
   file_picker = "auto", -- "auto", "netrw", "mini_files"
+  ai = {
+    cmd = nil,         -- CLI command to pipe diff into (e.g., "gh copilot suggest", "claude -p")
+    context = "file",  -- "file" (current file diff + file list) or "pr" (entire PR diff)
+  },
   keymaps = {
     next_file = "]f",
     prev_file = "[f",
@@ -29,6 +33,22 @@ M.values = vim.deepcopy(defaults)
 ---@param opts? table
 function M.setup(opts)
   M.values = vim.tbl_deep_extend("force", vim.deepcopy(defaults), opts or {})
+end
+
+--- Set a config value at runtime (dot-notation key path)
+--- e.g., set("ai.cmd", "claude -p")
+---@param key string Dot-separated key path
+---@param value any
+function M.set(key, value)
+  local keys = vim.split(key, ".", { plain = true })
+  local tbl = M.values
+  for i = 1, #keys - 1 do
+    if type(tbl[keys[i]]) ~= "table" then
+      tbl[keys[i]] = {}
+    end
+    tbl = tbl[keys[i]]
+  end
+  tbl[keys[#keys]] = value
 end
 
 return M

@@ -319,6 +319,97 @@ function M.reply_comment()
   end)
 end
 
+--- Ask AI for review assistance
+function M.ask_ai()
+  local review = require("code-review.review")
+  local git_mod = require("code-review.git")
+  if not review.current then
+    vim.notify("code-review: No active review session", vim.log.levels.WARN)
+    return
+  end
+
+  local ai_cmd = config.values.ai.cmd
+  if not ai_cmd or ai_cmd == "" then
+    vim.notify("code-review: No AI command configured. Set ai.cmd in setup() or use :CodeReviewSet ai.cmd \"your-command\"", vim.log.levels.WARN)
+    return
+  end
+
+  -- Build context based on mode
+  local context
+  local ai_context = config.values.ai.context or "file"
+  local s = review.current
+  if ai_context == "pr" then
+    context = git_mod.diff(s.pr.base_ref, s.pr.head_ref)
+  else
+    -- "file" mode: current file diff + file list
+    local file = review.current_file()
+    if not file then
+      vim.notify("code-review: No current file", vim.log.levels.WARN)
+      return
+    end
+    local file_diff_raw = git_mod.file_diff(s.pr.base_ref, s.pr.head_ref, file.path)
+    local file_list_text = "Changed files:\n"
+    for _, f in ipairs(s.files) do
+      file_list_text = file_list_text .. "  " .. f.status .. " " .. f.path .. "\n"
+    end
+    context = file_list_text .. "\nDiff for " .. file.path .. ":\n" .. file_diff_raw
+  end
+
+  vim.notify("code-review: Asking AI...", vim.log.levels.INFO)
+
+  -- Run the AI command asynchronously
+  local cmd_parts = vim.split(ai_cmd, "%s+")
+  local stdout_chunks = {}
+  local stderr_chunks = {}
+
+  vim.system(cmd_parts, {
+    stdin = context,
+  }, function(result)
+    vim.schedule(function()
+      local output = result.stdout or ""
+      if result.code ~= 0 then
+        vim.notify("code-review: AI command failed: " .. (result.stderr or ""), vim.log.levels.ERROR)
+        return
+      end
+
+      -- Display response in floating window
+      local lines = vim.split(output, "\n", { plain = true })
+      local buf = vim.api.nvim_create_buf(false, true)
+      vim.bo[buf].filetype = "markdown"
+      vim.bo[buf].bufhidden = "wipe"
+      vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
+      vim.bo[buf].modifiable = false
+
+      local width = math.min(100, math.floor(vim.o.columns * 0.8))
+      local height = math.min(30, math.max(5, #lines))
+      local win = vim.api.nvim_open_win(buf, true, {
+        relative = "editor",
+        row = math.floor((vim.o.lines - height) / 2),
+        col = math.floor((vim.o.columns - width) / 2),
+        width = width,
+        height = height,
+        style = "minimal",
+        border = "rounded",
+        title = " 🤖 AI Review ",
+        title_pos = "center",
+      })
+
+      vim.keymap.set("n", "q", function()
+        vim.api.nvim_win_close(win, true)
+      end, { buffer = buf, desc = "Close AI review" })
+      vim.keymap.set("n", "<Esc>", function()
+        vim.api.nvim_win_close(win, true)
+      end, { buffer = buf, desc = "Close AI review" })
+    end)
+  end)
+end
+
+--- Set a config value at runtime
+function M.set_config(key, value)
+  config.set(key, value)
+  vim.notify("code-review: Set " .. key .. " = " .. tostring(value), vim.log.levels.INFO)
+end
+
 --- Refresh the current session
 function M.refresh()
   local review = require("code-review.review")
