@@ -107,20 +107,64 @@ function M.submit(review_session, file_path, line_num, body, callback)
   end
 end
 
---- Display comments as virtual text on a buffer
+--- Build threaded comment structure from flat comments
+---@param comments Comment[]
+---@return table[] threads List of {root: Comment, replies: Comment[]}
+function M.build_threads(comments)
+  -- Index root comments (those without in_reply_to)
+  local roots = {}
+  local replies_map = {} -- comment_id -> replies list
+  for _, c in ipairs(comments) do
+    if not c.in_reply_to then
+      table.insert(roots, c)
+      if not replies_map[c.id] then
+        replies_map[c.id] = {}
+      end
+    end
+  end
+  -- Collect replies
+  for _, c in ipairs(comments) do
+    if c.in_reply_to then
+      if not replies_map[c.in_reply_to] then
+        replies_map[c.in_reply_to] = {}
+      end
+      table.insert(replies_map[c.in_reply_to], c)
+    end
+  end
+  -- Build thread list
+  local threads = {}
+  for _, root in ipairs(roots) do
+    table.insert(threads, {
+      root = root,
+      replies = replies_map[root.id] or {},
+    })
+  end
+  return threads
+end
+
+--- Display comments as virtual text on a buffer (with threading)
 ---@param buf number Buffer number
 ---@param comments Comment[] Comments to display
 ---@param offset? number Line offset (for unified diff headers)
 function M.display_virtual(buf, comments, offset)
   offset = offset or 0
-  for _, c in ipairs(comments) do
-    if c.line then
-      local line_idx = c.line - 1 + offset
+  local threads = M.build_threads(comments)
+
+  for _, thread in ipairs(threads) do
+    local root = thread.root
+    if root.line then
+      local line_idx = root.line - 1 + offset
       if line_idx >= 0 and line_idx < vim.api.nvim_buf_line_count(buf) then
+        local virt_lines = {
+          { { "  💬 " .. root.author .. ": " .. root.body:gsub("\n", " "), "CodeReviewComment" } },
+        }
+        for _, reply in ipairs(thread.replies) do
+          table.insert(virt_lines, {
+            { "    ↳ " .. reply.author .. ": " .. reply.body:gsub("\n", " "), "CodeReviewComment" },
+          })
+        end
         vim.api.nvim_buf_set_extmark(buf, ui.ns, line_idx, 0, {
-          virt_lines = {
-            { { "  💬 " .. c.author .. ": " .. c.body:gsub("\n", " "), "CodeReviewComment" } },
-          },
+          virt_lines = virt_lines,
         })
       end
     end

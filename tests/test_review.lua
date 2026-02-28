@@ -147,6 +147,7 @@ suite["review.file_list includes comment and current indicators"] = function()
       { id = 1, path = "a.lua", body = "test", line = 1, author = "u", created_at = "", side = "RIGHT" },
     },
     current_file_idx = 1,
+    reviewed = {},
   }
 
   local list = review.file_list()
@@ -166,6 +167,169 @@ suite["review functions return nil when no session"] = function()
   expect.equality(review.goto_file(1), nil)
   expect.equality(#review.file_list(), 0)
   expect.equality(#review.comments_for_file("test"), 0)
+end
+
+suite["review.next_comment finds next in current file"] = function()
+  local review = require("code-review.review")
+  review.current = {
+    active = true,
+    files = {
+      { path = "a.lua", status = "M" },
+      { path = "b.lua", status = "A" },
+    },
+    file_diffs = {},
+    comments = {
+      { id = 1, path = "a.lua", body = "c1", line = 5, author = "u", created_at = "", side = "RIGHT" },
+      { id = 2, path = "a.lua", body = "c2", line = 15, author = "u", created_at = "", side = "RIGHT" },
+      { id = 3, path = "b.lua", body = "c3", line = 3, author = "u", created_at = "", side = "RIGHT" },
+    },
+    current_file_idx = 1,
+  }
+
+  -- Mock cursor at line 1 — next comment should be at line 5
+  -- Note: next_comment reads cursor from current window but in headless tests,
+  -- cursor is at line 1 by default
+  local c, f = review.next_comment()
+  expect.equality(c.line, 5)
+  expect.equality(f.path, "a.lua")
+end
+
+suite["review.next_comment wraps to next file"] = function()
+  local review = require("code-review.review")
+  review.current = {
+    active = true,
+    files = {
+      { path = "a.lua", status = "M" },
+      { path = "b.lua", status = "A" },
+    },
+    file_diffs = {},
+    comments = {
+      { id = 1, path = "a.lua", body = "c1", line = 1, author = "u", created_at = "", side = "RIGHT" },
+      { id = 2, path = "b.lua", body = "c2", line = 10, author = "u", created_at = "", side = "RIGHT" },
+    },
+    current_file_idx = 1,
+  }
+
+  -- Cursor at line 1, comment at line 1 is not "after" cursor (> not >=)
+  -- so it should wrap to next file
+  local c, f = review.next_comment()
+  expect.equality(c.line, 10)
+  expect.equality(f.path, "b.lua")
+  expect.equality(review.current.current_file_idx, 2)
+end
+
+suite["review.prev_comment finds prev in current file"] = function()
+  local review = require("code-review.review")
+  review.current = {
+    active = true,
+    files = {
+      { path = "a.lua", status = "M" },
+    },
+    file_diffs = {},
+    comments = {
+      { id = 1, path = "a.lua", body = "c1", line = 5, author = "u", created_at = "", side = "RIGHT" },
+      { id = 2, path = "a.lua", body = "c2", line = 15, author = "u", created_at = "", side = "RIGHT" },
+    },
+    current_file_idx = 1,
+  }
+
+  -- In headless mode cursor is at 1, so prev_comment finds nothing before line 1
+  -- and wraps around to last comment (line 15)
+  local c, f = review.prev_comment()
+  expect.equality(c.line, 15)
+  expect.equality(f.path, "a.lua")
+end
+
+suite["review.next_comment returns nil when no comments"] = function()
+  local review = require("code-review.review")
+  review.current = {
+    active = true,
+    files = {
+      { path = "a.lua", status = "M" },
+    },
+    file_diffs = {},
+    comments = {},
+    current_file_idx = 1,
+  }
+
+  local c, f = review.next_comment()
+  expect.equality(c, nil)
+  expect.equality(f, nil)
+end
+
+suite["review.toggle_reviewed tracks file status"] = function()
+  local review = require("code-review.review")
+  review.current = {
+    active = true,
+    files = {
+      { path = "a.lua", status = "M" },
+      { path = "b.lua", status = "A" },
+    },
+    file_diffs = {},
+    comments = {},
+    current_file_idx = 1,
+    reviewed = {},
+  }
+
+  -- Initially not reviewed
+  expect.equality(review.is_reviewed("a.lua"), false)
+
+  -- Toggle on
+  local status = review.toggle_reviewed()
+  expect.equality(status, true)
+  expect.equality(review.is_reviewed("a.lua"), true)
+
+  -- Toggle off
+  status = review.toggle_reviewed()
+  expect.equality(status, false)
+  expect.equality(review.is_reviewed("a.lua"), false)
+end
+
+suite["review.review_progress counts reviewed files"] = function()
+  local review = require("code-review.review")
+  review.current = {
+    active = true,
+    files = {
+      { path = "a.lua", status = "M" },
+      { path = "b.lua", status = "A" },
+      { path = "c.lua", status = "D" },
+    },
+    file_diffs = {},
+    comments = {},
+    current_file_idx = 1,
+    reviewed = { ["a.lua"] = true, ["c.lua"] = true },
+  }
+
+  local reviewed, total = review.review_progress()
+  expect.equality(reviewed, 2)
+  expect.equality(total, 3)
+end
+
+suite["review.file_list includes reviewed indicator"] = function()
+  local review = require("code-review.review")
+  review.current = {
+    active = true,
+    files = {
+      { path = "a.lua", status = "M" },
+      { path = "b.lua", status = "A" },
+    },
+    file_diffs = {},
+    comments = {},
+    current_file_idx = 1,
+    reviewed = { ["a.lua"] = true },
+  }
+
+  local list = review.file_list()
+  expect.equality(list[1].reviewed, true)
+  expect.equality(list[2].reviewed, false)
+end
+
+suite["review.refresh returns error when no session"] = function()
+  local review = require("code-review.review")
+  review.current = nil
+  local ok, err = review.refresh()
+  expect.equality(ok, false)
+  assert(err:match("No active"), "Expected no active session error")
 end
 
 return suite

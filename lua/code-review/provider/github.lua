@@ -130,4 +130,63 @@ function M.post_comment(owner, repo, pr_number, file, line, body, commit_id)
   }, nil
 end
 
+--- Submit a PR review (approve, request changes, or comment)
+---@param owner string
+---@param repo string
+---@param pr_number number
+---@param event string "APPROVE"|"REQUEST_CHANGES"|"COMMENT"
+---@param body string Review summary
+---@return table|nil review
+---@return string|nil error
+function M.submit_review(owner, repo, pr_number, event, body)
+  local data, err = gh_api(
+    "repos/" .. owner .. "/" .. repo .. "/pulls/" .. pr_number .. "/reviews",
+    "POST",
+    {
+      event = event,
+      body = body,
+    }
+  )
+  if err then
+    return nil, err
+  end
+
+  return {
+    id = data.id,
+    state = data.state,
+    body = data.body,
+    user = data.user and data.user.login or "unknown",
+  }, nil
+end
+
+--- Reply to a review comment on a PR
+---@param owner string
+---@param repo string
+---@param pr_number number
+---@param comment_id number The ID of the comment to reply to
+---@param body string Reply body
+---@return Comment|nil comment
+---@return string|nil error
+function M.reply_to_comment(owner, repo, pr_number, comment_id, body)
+  local data, err = gh_api(
+    "repos/" .. owner .. "/" .. repo .. "/pulls/" .. pr_number .. "/comments/" .. comment_id .. "/replies",
+    "POST",
+    { body = body }
+  )
+  if err then
+    return nil, err
+  end
+
+  return {
+    id = data.id,
+    body = data.body,
+    path = data.path,
+    line = data.line or data.original_line,
+    side = data.side or "RIGHT",
+    author = data.user.login,
+    created_at = data.created_at,
+    in_reply_to = data.in_reply_to_id,
+  }, nil
+end
+
 return M

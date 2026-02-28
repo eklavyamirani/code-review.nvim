@@ -94,8 +94,7 @@ suite["detect finds github provider for this repo"] = function()
   expect.no_equality(prov, nil)
   expect.equality(prov.name, "github")
   expect.equality(owner, "eklavyamirani")
-  -- parse_remote strips .nvim from the repo name at the .git boundary
-  expect.no_equality(repo, nil)
+  expect.equality(repo, "code-review.nvim")
 end
 
 suite["detect returns nil for unknown hosts"] = function()
@@ -103,6 +102,16 @@ suite["detect returns nil for unknown hosts"] = function()
   local detect = require("code-review.provider.detect")
   local prov, _, _ = detect.detect("nonexistent-remote")
   expect.equality(prov, nil)
+end
+
+suite["github provider has submit_review method"] = function()
+  local github = require("code-review.provider.github")
+  expect.equality(type(github.submit_review), "function")
+end
+
+suite["github provider has reply_to_comment method"] = function()
+  local github = require("code-review.provider.github")
+  expect.equality(type(github.reply_to_comment), "function")
 end
 
 return suite

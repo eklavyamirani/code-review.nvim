@@ -43,13 +43,15 @@ end
 ---@return string|nil owner
 ---@return string|nil repo
 function M.parse_remote(url)
-  -- SSH: git@github.com:owner/repo.git
-  local owner, repo = url:match("git@[^:]+:([^/]+)/([^/%.]+)")
+  -- Strip trailing .git suffix
+  url = url:gsub("%.git$", "")
+  -- SSH: git@github.com:owner/repo
+  local owner, repo = url:match("git@[^:]+:([^/]+)/(.+)$")
   if owner and repo then
     return owner, repo
   end
-  -- HTTPS: https://github.com/owner/repo.git
-  owner, repo = url:match("https?://[^/]+/([^/]+)/([^/%.]+)")
+  -- HTTPS: https://github.com/owner/repo
+  owner, repo = url:match("https?://[^/]+/([^/]+)/(.+)$")
   if owner and repo then
     return owner, repo
   end
