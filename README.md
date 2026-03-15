@@ -139,6 +139,8 @@ See `lua/code-review/provider/github.lua` for a reference implementation.
 
 ## Development
 
+### Running tests (Docker)
+
 ```bash
 # Setup
 cp .env.example .env    # Add your GH_TOKEN
@@ -150,6 +152,61 @@ docker compose run --rm dev bash scripts/test.sh
 # Validate infrastructure
 docker compose run --rm dev bash scripts/validate.sh
 ```
+
+### Testing with a live Neovim instance
+
+To test local changes interactively in your own Neovim, point Neovim at
+this repo instead of the installed version.
+
+**Option A — lazy.nvim `dir` (recommended if you use lazy.nvim)**
+
+Replace the remote plugin spec with a local `dir` path:
+
+```lua
+{
+  dir = "/path/to/code-review.nvim",   -- absolute path to your local clone
+  dependencies = { "nvim-lua/plenary.nvim" },
+  config = function()
+    require("code-review").setup()
+  end,
+}
+```
+
+**Option B — prepend to runtimepath**
+
+Add this near the top of your `init.lua`, *before* any plugin manager loads
+the remote version:
+
+```lua
+vim.opt.runtimepath:prepend("/path/to/code-review.nvim")
+require("code-review").setup()
+```
+
+**Option C — symlink into Neovim's pack directory**
+
+```bash
+mkdir -p ~/.local/share/nvim/site/pack/dev/start
+ln -s /path/to/code-review.nvim ~/.local/share/nvim/site/pack/dev/start/code-review.nvim
+```
+
+> **Note:** The `ln -s` source must be an absolute path. A relative path
+> (or running the command from the wrong directory) will create a broken
+> symlink and Neovim won't find the module.
+
+Then call `require("code-review").setup()` in your config as usual. Remove
+or disable the plugin-manager-installed copy to avoid conflicts.
+
+**Reloading changes**
+
+Neovim caches Lua modules after `require()`. After editing plugin source
+files you need to clear the cache and re-source:
+
+```vim
+:lua for k, _ in pairs(package.loaded) do if k:match("^code%-review") then package.loaded[k] = nil end end
+:lua require("code-review").setup()
+```
+
+Or simply restart Neovim to pick up all changes.
 
 ## License
 
